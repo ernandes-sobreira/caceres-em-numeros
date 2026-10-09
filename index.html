@@ -416,7 +416,7 @@ function initClimateData(){
   let urban=D.sectors.filter(r=>r.situacao==='Urbana');
   let keys=['ent_dom_bueiro','ent_dom_arborizacao_alguma','densidade','sem_rede','fossa','esgoto_adequado','criancas','idosos','renda_mediana_resp'],ranges={};
   keys.forEach(k=>{let v=urban.map(r=>Number(r[k])).filter(Number.isFinite);ranges[k]=v.length?[Math.min(...v),Math.max(...v)]:[0,1]});
-  let norm=(r,k,inv)=>{let v=Number(r[k]);if(!Number.isFinite(v))return NaN;let a=ranges[k][0],b=ranges[k][1],z=b===a?.5:(v-a)/(b-a);return inv?1-z:z};
+  let norm=(r,k,inv)=>{let v=Number(r[k]);if(!Number.isFinite(v))return NaN;let a=ranges[k][0],b=ranges[k][1],z=b===a ? 0.5 : (v-a)/(b-a);return inv?1-z:z};
   urban.forEach(r=>{
     let flood=climateWeighted([[r.alagamento==='Sim'?1:0,.45],[norm(r,'ent_dom_bueiro',true),.40],[norm(r,'densidade',false),.15]],2);
     let heat=climateWeighted([[norm(r,'ent_dom_arborizacao_alguma',true),.70],[norm(r,'densidade',false),.30]],1);
