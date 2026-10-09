@@ -276,7 +276,7 @@ header.bar .tabs::-webkit-scrollbar{display:none}
     <div class="climate-hero-side">
       <div><b>V1 exploratória</b><span>Censo 2022 + CNEFE + indicadores já incorporados</span></div>
       <div><b>Sem inventar ausentes</b><span>valores ausentes não são tratados como zero</span></div>
-      <div><b>Próxima camada</b><span>suscetibilidade oficial à inundação do SGB/CPRM</span></div>
+      <div><b>Camada oficial SGB 2023</b><span>consulta direta ao serviço raster nacional de suscetibilidade à inundação</span></div>
     </div>
   </div>
 
@@ -290,7 +290,8 @@ header.bar .tabs::-webkit-scrollbar{display:none}
       </select>
       <select id="climateMetric">
         <option value="ivc">Vulnerabilidade climática integrada — IVC V1</option>
-        <option value="flood">Alagamento e drenagem</option>
+        <option value="sgb">SGB 2023 — suscetibilidade oficial à inundação</option>
+        <option value="flood">Alagamento e drenagem — proxy</option>
         <option value="heat">Calor urbano — proxy</option>
         <option value="hydro">Fragilidade hídrico-sanitária</option>
         <option value="social">Sensibilidade social</option>
@@ -301,7 +302,8 @@ header.bar .tabs::-webkit-scrollbar{display:none}
       <button class="action" id="climateZin">Zoom +</button>
       <button class="action" id="climateZout">Zoom −</button>
     </div>
-    <div class="climate-note"><b>Importante:</b> “alagamento e drenagem” nesta versão é um <b>proxy territorial</b> construído com o registro de alagamento já presente na base, ausência de bueiro e densidade. Ainda não deve ser lido como mapa oficial de risco de inundação.</div>
+    <div class="climate-note"><b>Importante:</b> “alagamento e drenagem” continua sendo um <b>proxy territorial</b>. Já a camada <b>SGB 2023</b> usa o raster oficial de suscetibilidade a inundação do Serviço Geológico do Brasil. Para evitar uma precisão falsa, cada setor recebe a classe oficial observada <b>no centroide do setor</b>; isso não significa que toda a área ou toda a população do setor esteja exposta à mesma classe.</div>
+    <div class="notice good" id="sgbFloodStatus" style="margin-top:10px"><b>SGB 2023:</b> carregando a suscetibilidade oficial à inundação...</div>
   </div>
 
   <div class="climate-layout">
@@ -335,8 +337,9 @@ header.bar .tabs::-webkit-scrollbar{display:none}
         <div><b>Sensibilidade</b><span>55% perfil social + 45% fragilidade hídrico-sanitária.</span></div>
         <div><b>IVC V1</b><span>40% exposição + 35% sensibilidade + 25% déficit de capacidade adaptativa.</span></div>
       </div>
-      <p class="source" style="margin-top:12px"><b>Variáveis usadas:</b> registro de alagamento, bueiro, arborização, densidade, água sem rede, fossa, esgoto adequado, crianças, idosos e renda mediana do responsável. A camada oficial de suscetibilidade a inundação do SGB/CPRM (2023) será incorporada separadamente para não misturar perigo físico oficial com proxies censitários.</p>
-      <a class="dl" style="margin-top:10px" href="https://rigeo.sgb.gov.br/items/685b941f-9101-4fe0-b2b8-1fa32ec94b6e" target="_blank" rel="noopener">↗ Fonte oficial SGB/CPRM — suscetibilidade de Cáceres</a>
+      <p class="source" style="margin-top:12px"><b>Variáveis do IVC V1:</b> registro de alagamento, bueiro, arborização, densidade, água sem rede, fossa, esgoto adequado, crianças, idosos e renda mediana do responsável. <b>Camada SGB:</b> raster temático oficial de suscetibilidade à inundação, classes Baixa, Média e Alta, consultado diretamente no Geoportal SGB. A classe setorial exibida corresponde ao pixel no centroide do setor.</p>
+      <a class="dl" style="margin-top:10px" href="https://rigeo.sgb.gov.br/items/685b941f-9101-4fe0-b2b8-1fa32ec94b6e" target="_blank" rel="noopener">↗ Carta de suscetibilidade de Cáceres — SGB/CPRM, 2023</a>
+      <a class="dl" style="margin-top:8px" href="https://geoportal.sgb.gov.br/image/rest/services/gestao_territorial/suscetibilidade_inundacao/ImageServer" target="_blank" rel="noopener">↗ Serviço raster oficial usado pelo painel</a>
     </div>
   </div>
 </section>
@@ -431,30 +434,55 @@ function initClimateData(){
   return {urban:urban,ranges:ranges};
 }
 function climateRows(){if(!CLIMATE)return[];return $('climateScope').value==='city'?CLIMATE.urban.filter(r=>CITY.coreIds.includes(r.id)):CLIMATE.urban}
-function climateVal(r,k){if(k==='alagamento')return r.alagamento==='Sim'?1:0;return r._clima?Number(r._clima[k]):NaN}
-function climateMetricName(k){return {ivc:'Vulnerabilidade climática integrada — IVC V1',flood:'Alagamento e drenagem — proxy',heat:'Calor urbano — proxy',hydro:'Fragilidade hídrico-sanitária',social:'Sensibilidade social',deficit:'Déficit de capacidade adaptativa',alagamento:'Setores com registro de alagamento'}[k]||k}
+function climateVal(r,k){if(k==='alagamento')return r.alagamento==='Sim'?1:0;if(k==='sgb')return r._clima&&Number.isFinite(r._clima.sgbSeverity)?r._clima.sgbSeverity:NaN;return r._clima?Number(r._clima[k]):NaN}
+function climateMetricName(k){return {ivc:'Vulnerabilidade climática integrada — IVC V1',sgb:'SGB 2023 — suscetibilidade oficial à inundação',flood:'Alagamento e drenagem — proxy',heat:'Calor urbano — proxy',hydro:'Fragilidade hídrico-sanitária',social:'Sensibilidade social',deficit:'Déficit de capacidade adaptativa',alagamento:'Setores com registro de alagamento'}[k]||k}
+function sgbClassFromValue(v){return Number(v)===2?'Alta':Number(v)===1?'Média':Number(v)===3?'Baixa':null}
+function sgbSeverity(cls){return cls==='Alta'?1:cls==='Média'?.55:cls==='Baixa'?.15:NaN}
+function sgbColor(cls){return cls==='Alta'?'rgb(90,90,255)':cls==='Média'?'rgb(160,160,255)':cls==='Baixa'?'rgb(208,208,255)':'#dfe4e8'}
+function climatePathCentroid(path){let a=(path.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number),pts=[];for(let i=0;i+1<a.length;i+=2)pts.push([a[i],a[i+1]]);if(!pts.length)return null;if(pts.length>1&&pts[0][0]===pts[pts.length-1][0]&&pts[0][1]===pts[pts.length-1][1])pts.pop();if(pts.length<3){let x=pts.reduce((s,p)=>s+p[0],0)/pts.length,y=pts.reduce((s,p)=>s+p[1],0)/pts.length;return [x,y]}let A=0,Cx=0,Cy=0;for(let i=0;i<pts.length;i++){let p=pts[i],q=pts[(i+1)%pts.length],cross=p[0]*q[1]-q[0]*p[1];A+=cross;Cx+=(p[0]+q[0])*cross;Cy+=(p[1]+q[1])*cross}A*=.5;if(Math.abs(A)<1e-9)return [pts.reduce((s,p)=>s+p[0],0)/pts.length,pts.reduce((s,p)=>s+p[1],0)/pts.length];return [Cx/(6*A),Cy/(6*A)]}
+async function loadSgbFlood(){
+  let status=$('sgbFloodStatus'),rows=CLIMATE.urban,base='https://geoportal.sgb.gov.br/image/rest/services/gestao_territorial/suscetibilidade_inundacao/ImageServer/getSamples';
+  rows.forEach(r=>{r._clima.sgbValue=NaN;r._clima.sgbClass=null;r._clima.sgbSeverity=NaN;r._clima.sgbCentroid=climatePathCentroid(r.path)});
+  try{
+    let chunks=[];for(let i=0;i<rows.length;i+=55)chunks.push(rows.slice(i,i+55));
+    let done=0;
+    for(let ci=0;ci<chunks.length;ci++){
+      let chunk=chunks[ci],pts=chunk.map(r=>[r._clima.sgbCentroid[0],-r._clima.sgbCentroid[1]]),geom=JSON.stringify({points:pts,spatialReference:{wkid:31981}}),params=new URLSearchParams({geometryType:'esriGeometryMultipoint',geometry:geom,returnFirstValueOnly:'true',interpolation:'RSP_NearestNeighbor',f:'json'}),res=await fetch(base+'?'+params.toString());
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      let j=await res.json();if(j.error)throw new Error(j.error.message||'erro SGB');
+      let samples=Array.isArray(j.samples)?j.samples:[];
+      samples.forEach((s,idx)=>{let local=Number.isFinite(Number(s.locationId))?Number(s.locationId)-1:idx;if(local<0||local>=chunk.length)return;let r=chunk[local],raw=parseInt(String(s.value).split(',')[0],10),cls=sgbClassFromValue(raw);r._clima.sgbValue=raw;r._clima.sgbClass=cls;r._clima.sgbSeverity=sgbSeverity(cls);if(cls)done++});
+    }
+    status.className='notice good';status.innerHTML='<b>SGB 2023 carregado:</b> '+done+' de '+rows.length+' setores urbanos receberam a classe oficial do raster no centroide. Classes do raster: 1 = Média, 2 = Alta, 3 = Baixa.';
+  }catch(err){
+    status.className='notice';status.innerHTML='<b>SGB 2023:</b> o serviço oficial não respondeu agora ('+String(err.message||err)+'). Os indicadores locais continuam funcionando; tente recarregar a página para consultar novamente a camada oficial.';
+  }
+  renderClimateAll();
+}
 function climateColor(t){t=Math.max(0,Math.min(1,t));let a=[[220,239,228],[157,211,190],[244,215,123],[238,149,80],[179,38,30]],p=t*4,i=Math.min(3,Math.floor(p)),u=p-i,c=a[i].map((v,j)=>Math.round(v+(a[i+1][j]-v)*u));return 'rgb('+c[0]+','+c[1]+','+c[2]+')'}
 function climateQuant(a,q){let x=a.filter(Number.isFinite).slice().sort((a,b)=>a-b);if(!x.length)return NaN;let p=(x.length-1)*q,b=Math.floor(p),d=p-b;return x[b]+(x[b+1]!==undefined?d*(x[b+1]-x[b]):0)}
 function climateClass(v,k,rows){if(!Number.isFinite(v))return 'Sem dado';if(k==='alagamento')return v===1?'Com registro':'Sem registro';let vals=rows.map(r=>climateVal(r,k)).filter(Number.isFinite),q20=climateQuant(vals,.2),q40=climateQuant(vals,.4),q60=climateQuant(vals,.6),q80=climateQuant(vals,.8);return v>=q80?'Muito alta':v>=q60?'Alta':v>=q40?'Moderada':v>=q20?'Baixa':'Muito baixa'}
 function climatePct(v){return Number.isFinite(v)?Math.round(v*100)+'%':'—'}
 function climateMeter(label,v){return '<div><div class="climate-dim-head"><span>'+label+'</span><b>'+climatePct(v)+'</b></div><div class="climate-meter"><i style="width:'+(Number.isFinite(v)?Math.max(2,Math.min(100,v*100)):0)+'%"></i></div></div>'}
 function renderClimateKpis(){
-  let rows=climateRows(),iv=rows.map(r=>climateVal(r,'ivc')).filter(Number.isFinite),q80=climateQuant(iv,.8),high=rows.filter(r=>Number.isFinite(climateVal(r,'ivc'))&&climateVal(r,'ivc')>=q80),flooded=rows.filter(r=>r.alagamento==='Sim'),tree=rows.map(r=>Number(r.ent_dom_arborizacao_alguma)).filter(Number.isFinite),q25=climateQuant(tree,.25),lowTree=rows.filter(r=>Number.isFinite(Number(r.ent_dom_arborizacao_alguma))&&Number(r.ent_dom_arborizacao_alguma)<=q25);
-  let popHigh=high.reduce((s,r)=>s+(Number(r.populacao)||0),0),popFlood=flooded.reduce((s,r)=>s+(Number(r.populacao)||0),0);
+  let rows=climateRows(),iv=rows.map(r=>climateVal(r,'ivc')).filter(Number.isFinite),q80=climateQuant(iv,.8),high=rows.filter(r=>Number.isFinite(climateVal(r,'ivc'))&&climateVal(r,'ivc')>=q80),flooded=rows.filter(r=>r.alagamento==='Sim'),tree=rows.map(r=>Number(r.ent_dom_arborizacao_alguma)).filter(Number.isFinite),q25=climateQuant(tree,.25),lowTree=rows.filter(r=>Number.isFinite(Number(r.ent_dom_arborizacao_alguma))&&Number(r.ent_dom_arborizacao_alguma)<=q25),sgbHigh=rows.filter(r=>r._clima&&r._clima.sgbClass==='Alta');
+  let popHigh=high.reduce((s,r)=>s+(Number(r.populacao)||0),0),popFlood=flooded.reduce((s,r)=>s+(Number(r.populacao)||0),0),popSgb=sgbHigh.reduce((s,r)=>s+(Number(r.populacao)||0),0);
   $('climateKpis').innerHTML=[
     [high.length,'setores no quintil mais vulnerável',fmt(popHigh)+' pessoas'],
     [flooded.length,'setores com registro de alagamento',fmt(popFlood)+' pessoas'],
-    [lowTree.length,'setores no quartil de menor arborização','proxy de maior carga térmica'],
-    [iv.length,'setores com IVC V1 calculado','ausentes não viram zero']
+    [sgbHigh.length||'—','centroides em suscetibilidade SGB alta',sgbHigh.length?fmt(popSgb)+' pessoas nesses setores':'aguardando serviço SGB'],
+    [lowTree.length,'setores no quartil de menor arborização','proxy de maior carga térmica']
   ].map(x=>'<div class="card climate-kpi"><b>'+x[0]+'</b><small>'+x[1]+'</small><div class="source">'+x[2]+'</div></div>').join('');
 }
 function climateFit(){climateView=($('climateScope').value==='city'?CITY.coreView:D.viewboxes.urban).slice();renderClimateMap()}
 function climateZoom(f){if(!climateView)return climateFit();let x=climateView[0],y=climateView[1],w=climateView[2],h=climateView[3],nw=w*f,nh=h*f;climateView=[x+(w-nw)/2,y+(h-nh)/2,nw,nh];renderClimateMap()}
 function renderClimateMap(){
   let rows=climateRows(),k=$('climateMetric').value,svg=$('climateMap');if(!climateView)climateView=($('climateScope').value==='city'?CITY.coreView:D.viewboxes.urban).slice();svg.setAttribute('viewBox',climateView.join(' '));svg.innerHTML='';
-  let vals=rows.map(r=>climateVal(r,k)).filter(Number.isFinite),lo=k==='alagamento'?0:climateQuant(vals,.05),hi=k==='alagamento'?1:climateQuant(vals,.95);if(hi===lo)hi=lo+1;
-  rows.forEach(r=>{let v=climateVal(r,k),p=document.createElementNS('http://www.w3.org/2000/svg','path'),fill;if(k==='alagamento')fill=v===1?'#b3261e':'#e7edf2';else fill=Number.isFinite(v)?climateColor((v-lo)/(hi-lo)):'#dfe4e8';p.setAttribute('d',r.path);p.setAttribute('fill',fill);p.setAttribute('class','climate-sector'+(climateSelected&&climateSelected.id===r.id?' sel':''));p.dataset.climateId=r.id;p.onclick=()=>{climateSelected=r;renderClimateMap();renderClimateDetail(r)};let title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=(r.bairro||'Sem bairro')+' • '+climateMetricName(k)+': '+(k==='alagamento'?(v===1?'Sim':'Não'):climatePct(v));p.appendChild(title);svg.appendChild(p)});
-  $('climateMapTitle').textContent=climateMetricName(k);$('climateLegTitle').textContent=climateMetricName(k);$('climateLegMin').textContent=k==='alagamento'?'sem registro':'menor';$('climateLegMax').textContent=k==='alagamento'?'com registro':'maior';$('climateGrad').style.background=k==='alagamento'?'linear-gradient(90deg,#e7edf2 0 49%,#b3261e 51% 100%)':'linear-gradient(90deg,#dcefe4,#9dd3be,#f4d77b,#ee9550,#b3261e)';
+  let vals=rows.map(r=>climateVal(r,k)).filter(Number.isFinite),lo=(k==='alagamento'||k==='sgb')?0:climateQuant(vals,.05),hi=(k==='alagamento'||k==='sgb')?1:climateQuant(vals,.95);if(hi===lo)hi=lo+1;
+  rows.forEach(r=>{let v=climateVal(r,k),p=document.createElementNS('http://www.w3.org/2000/svg','path'),fill;if(k==='alagamento')fill=v===1?'#b3261e':'#e7edf2';else if(k==='sgb')fill=sgbColor(r._clima&&r._clima.sgbClass);else fill=Number.isFinite(v)?climateColor((v-lo)/(hi-lo)):'#dfe4e8';p.setAttribute('d',r.path);p.setAttribute('fill',fill);p.setAttribute('class','climate-sector'+(climateSelected&&climateSelected.id===r.id?' sel':''));p.dataset.climateId=r.id;p.onclick=()=>{climateSelected=r;renderClimateMap();renderClimateDetail(r)};let title=document.createElementNS('http://www.w3.org/2000/svg','title');let shown=k==='alagamento'?(v===1?'Sim':'Não'):k==='sgb'?(r._clima.sgbClass||'Sem dado'):climatePct(v);title.textContent=(r.bairro||'Sem bairro')+' • '+climateMetricName(k)+': '+shown;p.appendChild(title);svg.appendChild(p)});
+  $('climateMapTitle').textContent=climateMetricName(k);$('climateLegTitle').textContent=climateMetricName(k);
+  if(k==='sgb'){$('climateLegMin').textContent='Baixa';$('climateLegMax').textContent='Alta';$('climateGrad').style.background='linear-gradient(90deg,rgb(208,208,255) 0 33%,rgb(160,160,255) 33% 66%,rgb(90,90,255) 66% 100%)'}
+  else{$('climateLegMin').textContent=k==='alagamento'?'sem registro':'menor';$('climateLegMax').textContent=k==='alagamento'?'com registro':'maior';$('climateGrad').style.background=k==='alagamento'?'linear-gradient(90deg,#e7edf2 0 49%,#b3261e 51% 100%)':'linear-gradient(90deg,#dcefe4,#9dd3be,#f4d77b,#ee9550,#b3261e)'}
 }
 function renderClimateDetail(r){
   if(!r){$('climateDetail').className='climate-detail-empty';$('climateDetail').innerHTML='Clique em um setor no mapa ou no ranking para ver por que ele aparece como mais ou menos vulnerável.';return}
@@ -470,6 +498,7 @@ function renderClimateDetail(r){
     climateMeter('Déficit de capacidade adaptativa',r._clima.deficit)+
     '</div>'+
     '<div class="detailgrid" style="margin-top:14px">'+
+    detailItem('SGB 2023 — suscetibilidade no centroide',r._clima.sgbClass||'aguardando/sem dado')+
     detailItem('Alagamento registrado',r.alagamento||'—')+
     detailItem('Bueiro',fmt(r.ent_dom_bueiro,'pct'))+
     detailItem('Arborização',fmt(r.ent_dom_arborizacao_alguma,'pct'))+
@@ -484,9 +513,10 @@ function renderClimateDetail(r){
 function renderClimateRank(){
   let rows=climateRows(),k=$('climateMetric').value,arr;
   if(k==='alagamento')arr=rows.filter(r=>r.alagamento==='Sim').sort((a,b)=>climateVal(b,'flood')-climateVal(a,'flood'));
+  else if(k==='sgb')arr=rows.filter(r=>r._clima&&r._clima.sgbClass).sort((a,b)=>(b._clima.sgbSeverity-a._clima.sgbSeverity)||(b._clima.ivc-a._clima.ivc));
   else arr=rows.filter(r=>Number.isFinite(climateVal(r,k))).sort((a,b)=>climateVal(b,k)-climateVal(a,k));
-  arr=arr.slice(0,12);$('climateRankTitle').textContent=k==='alagamento'?'Setores com registro de alagamento':'Top 12 — '+climateMetricName(k);
-  $('climateRank').innerHTML=arr.map((r,i)=>'<div class="climate-rank-row" data-climate-rank="'+r.id+'"><span class="n">'+(i+1)+'</span><span><b>'+(r.bairro||'Sem bairro cadastrado')+'</b><small>Setor '+r.id+' • '+fmt(r.populacao)+' pessoas</small></span><span class="score">'+(k==='alagamento'?climatePct(r._clima.flood):climatePct(climateVal(r,k)))+'</span></div>').join('');
+  arr=arr.slice(0,12);$('climateRankTitle').textContent=k==='alagamento'?'Setores com registro de alagamento':k==='sgb'?'Prioridade pela classe oficial SGB no centroide':'Top 12 — '+climateMetricName(k);
+  $('climateRank').innerHTML=arr.map((r,i)=>'<div class="climate-rank-row" data-climate-rank="'+r.id+'"><span class="n">'+(i+1)+'</span><span><b>'+(r.bairro||'Sem bairro cadastrado')+'</b><small>Setor '+r.id+' • '+fmt(r.populacao)+' pessoas</small></span><span class="score">'+(k==='alagamento'?climatePct(r._clima.flood):k==='sgb'?(r._clima.sgbClass||'—'):climatePct(climateVal(r,k)))+'</span></div>').join('');
   document.querySelectorAll('[data-climate-rank]').forEach(el=>el.onclick=()=>{let r=CLIMATE.urban.find(x=>x.id===el.dataset.climateRank);if(r){climateSelected=r;renderClimateMap();renderClimateDetail(r);$('climateDetail').scrollIntoView({behavior:'smooth',block:'nearest'})}});
 }
 function renderClimateAll(){renderClimateKpis();renderClimateMap();renderClimateRank();if(climateSelected&&climateRows().some(r=>r.id===climateSelected.id))renderClimateDetail(climateSelected);else renderClimateDetail(null)}
@@ -495,7 +525,7 @@ function initClimate(){
   $('climateMetric').onchange=()=>{renderClimateMap();renderClimateRank()};
   $('climateScope').onchange=()=>{climateSelected=null;climateView=($('climateScope').value==='city'?CITY.coreView:D.viewboxes.urban).slice();renderClimateAll()};
   $('climateFit').onclick=climateFit;$('climateZin').onclick=()=>climateZoom(.75);$('climateZout').onclick=()=>climateZoom(1.33);
-  renderClimateAll();
+  renderClimateAll();loadSgbFlood();
 }
 function renderStatsKpis(){$('statsKpis').innerHTML=[[D.summary.pca_n,'setores na PCA V4'],[D.summary.pca_pc1_pc2.toFixed(1)+'%','variância PC1+PC2'],[D.summary.moran_i.toFixed(3),'Moran I do índice V4'],['p='+D.summary.p_permutacao.toFixed(3),'permutação espacial']].map(x=>`<div class="card kpi"><b>${x[0]}</b><small>${x[1]}</small></div>`).join('')}
 function toCSV(rows){let keys=Object.keys(rows[0]).filter(k=>k!=='path'),esc=v=>{if(v===null||v===undefined)return '';let s=String(v).replaceAll('"','""');return /[;"\n]/.test(s)?'"'+s+'"':s};return keys.join(';')+'\n'+rows.map(r=>keys.map(k=>esc(r[k])).join(';')).join('\n')}function dl(name,text,type='text/csv;charset=utf-8'){let b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
