@@ -235,6 +235,94 @@ header.bar .tabs::-webkit-scrollbar{display:none}
 .climate-method-grid b{display:block;font-family:var(--display);margin-bottom:4px}
 @media(max-width:1050px){.climate-hero,.climate-layout{grid-template-columns:1fr}.climate-mapwrap{height:540px}.climate-method-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.climate-hero{padding:20px}.climate-hero h2{font-size:1.6rem}.climate-mapwrap{height:500px}.climate-method-grid{grid-template-columns:1fr}}
+</style>
+<style id="header-layout-fix-20261010">
+/* Cabeçalho: impede que a marca/autores encubram as abas e mantém todas acessíveis. */
+header.bar{
+  height:auto!important;
+  min-height:0!important;
+  overflow:visible!important;
+}
+header.bar .bar-in{
+  width:100%!important;
+  max-width:none!important;
+  padding:10px clamp(14px,2.2vw,42px)!important;
+  display:grid!important;
+  grid-template-columns:minmax(250px,320px) minmax(0,1fr) minmax(300px,390px)!important;
+  gap:12px 20px!important;
+  align-items:center!important;
+  overflow:visible!important;
+}
+header.bar .brand{
+  min-width:0!important;
+  overflow:hidden!important;
+  position:relative!important;
+  z-index:2!important;
+}
+header.bar .brand span{
+  min-width:0!important;
+  overflow:hidden!important;
+}
+header.bar .brand small{
+  display:block!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+header.bar .tabs{
+  min-width:0!important;
+  width:100%!important;
+  display:flex!important;
+  flex-wrap:nowrap!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:4px!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  padding:3px 4px 6px!important;
+  scroll-padding-inline:12px!important;
+  scrollbar-width:thin!important;
+  overscroll-behavior-inline:contain;
+}
+header.bar .tab{
+  flex:0 0 auto!important;
+  position:relative!important;
+  z-index:1!important;
+}
+header.bar .org-head{
+  min-width:0!important;
+  max-width:390px!important;
+}
+
+/* Em notebooks, libera imediatamente o espaço ocupado pelos autores. */
+@media(max-width:1650px){
+  header.bar .bar-in{
+    grid-template-columns:minmax(230px,300px) minmax(0,1fr)!important;
+  }
+  header.bar .org-head{display:none!important}
+}
+
+/* Em telas menores o menu ganha uma linha inteira e passa a rolar horizontalmente. */
+@media(max-width:1180px){
+  header.bar .bar-in{
+    grid-template-columns:1fr!important;
+    gap:7px!important;
+  }
+  header.bar .brand{justify-self:start!important}
+  header.bar .tabs{
+    justify-content:flex-start!important;
+    width:100%!important;
+    padding-bottom:7px!important;
+  }
+}
+
+/* Celular: mantém a marca compacta e todas as abas alcançáveis por swipe. */
+@media(max-width:650px){
+  header.bar .brand{font-size:1rem!important}
+  header.bar .brand-mark{width:32px!important;height:32px!important}
+  header.bar .tabs{gap:3px!important}
+  header.bar .tab{font-size:.84rem!important;padding:7px 10px!important}
+}
 </style></head><body><header class="bar"><div class="bar-in">
 <div class="brand"><img class="brand-mark" src="app-icon.png" alt="" aria-hidden="true"><span>Cáceres em Números<small>Território • sociedade • ambiente • saúde</small></span></div>
 <nav class="tabs"><button class="tab on" data-p="publico">Público</button><button class="tab" data-p="explorar">Explorar</button><button class="tab" data-p="comparar">Comparar</button><button class="tab" data-p="economia">Economia & trabalho</button><button class="tab" data-p="clima">Clima & ambiente</button><button class="tab" data-p="analitico">Análises avançadas</button><button class="tab" data-p="pesquisador">Pesquisador</button></nav>
@@ -575,5 +663,5 @@ function initClimate(){
 function renderStatsKpis(){$('statsKpis').innerHTML=[[D.summary.pca_n,'setores na PCA V4'],[D.summary.pca_pc1_pc2.toFixed(1)+'%','variância PC1+PC2'],[D.summary.moran_i.toFixed(3),'Moran I do índice V4'],['p='+D.summary.p_permutacao.toFixed(3),'permutação espacial']].map(x=>`<div class="card kpi"><b>${x[0]}</b><small>${x[1]}</small></div>`).join('')}
 function toCSV(rows){let keys=Object.keys(rows[0]).filter(k=>k!=='path'),esc=v=>{if(v===null||v===undefined)return '';let s=String(v).replaceAll('"','""');return /[;"\n]/.test(s)?'"'+s+'"':s};return keys.join(';')+'\n'+rows.map(r=>keys.map(k=>esc(r[k])).join(';')).join('\n')}function dl(name,text,type='text/csv;charset=utf-8'){let b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function initDownloads(){$('dlFull').onclick=()=>dl('CACERES_213_SETORES_V4.csv',toCSV(D.sectors));$('dlUrban').onclick=()=>dl('CACERES_153_URBANOS_V4.csv',toCSV(D.sectors.filter(r=>r.situacao==='Urbana')));$('dlAP').onclick=()=>dl('CACERES_7_AREAS_PONDERACAO.csv',toCSV(D.ap));$('dlJson').onclick=()=>dl('CACERES_V4.json',JSON.stringify(D,null,2),'application/json')}
-function activateTab(b,scrollTop=true){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));b.classList.add('on');let page=$(b.dataset.p);if(page)page.classList.add('on');if(scrollTop)window.scrollTo({top:0,left:0,behavior:'auto'})}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>activateTab(b,true));$('scope').onchange=e=>{currentScope=e.target.value;searchFocus=null;fit();renderMap()};$('metric').onchange=renderMap;$('search').oninput=updateSearchResults;$('search').onkeydown=searchKeydown;$('fit').onclick=fit;$('zin').onclick=()=>zoom(.75);$('zout').onclick=()=>zoom(1.33);$('panL').onclick=()=>panMap(-.18,0);$('panR').onclick=()=>panMap(.18,0);$('panU').onclick=()=>panMap(0,-.18);$('panD').onclick=()=>panMap(0,.18);$('compA').onchange=compare;$('compB').onchange=compare;$('labX').onchange=renderLab;$('labY').onchange=renderLab;$('downloadFiltered').onclick=()=>dl('CACERES_SELECAO.csv',toCSV(visibleRows()));let svg=$('map');svg.onpointerdown=e=>{e.preventDefault();drag={x:e.clientX,y:e.clientY,v:view.slice(),target:e.target,moved:false};$('tip').style.display='none';try{svg.setPointerCapture(e.pointerId)}catch(_){}};svg.onpointermove=e=>{if(!drag)return;e.preventDefault();let dist=Math.hypot(e.clientX-drag.x,e.clientY-drag.y);if(dist>4)drag.moved=true;if(!drag.moved)return;let rect=svg.getBoundingClientRect(),dx=(e.clientX-drag.x)/rect.width*drag.v[2],dy=(e.clientY-drag.y)/rect.height*drag.v[3];view=[drag.v[0]-dx,drag.v[1]-dy,drag.v[2],drag.v[3]];applyView()};svg.onpointerup=e=>{if(!drag)return;let d=drag;drag=null;if(!d.moved){let el=d.target;if(el?.dataset?.poiIndex!==undefined){showPoiDetail(POIS[+el.dataset.poiIndex])}else if(el?.dataset?.sectorId){selectSector(el.dataset.sectorId)}}};svg.onpointercancel=()=>drag=null;svg.onwheel=e=>{e.preventDefault();zoom(e.deltaY>0?1.15:.87);renderMap()};
+function activateTab(b,scrollTop=true){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));b.classList.add('on');let page=$(b.dataset.p);if(page)page.classList.add('on');if(scrollTop)window.scrollTo({top:0,left:0,behavior:'auto'})}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{activateTab(b,true);b.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'})});$('scope').onchange=e=>{currentScope=e.target.value;searchFocus=null;fit();renderMap()};$('metric').onchange=renderMap;$('search').oninput=updateSearchResults;$('search').onkeydown=searchKeydown;$('fit').onclick=fit;$('zin').onclick=()=>zoom(.75);$('zout').onclick=()=>zoom(1.33);$('panL').onclick=()=>panMap(-.18,0);$('panR').onclick=()=>panMap(.18,0);$('panU').onclick=()=>panMap(0,-.18);$('panD').onclick=()=>panMap(0,.18);$('compA').onchange=compare;$('compB').onchange=compare;$('labX').onchange=renderLab;$('labY').onchange=renderLab;$('downloadFiltered').onclick=()=>dl('CACERES_SELECAO.csv',toCSV(visibleRows()));let svg=$('map');svg.onpointerdown=e=>{e.preventDefault();drag={x:e.clientX,y:e.clientY,v:view.slice(),target:e.target,moved:false};$('tip').style.display='none';try{svg.setPointerCapture(e.pointerId)}catch(_){}};svg.onpointermove=e=>{if(!drag)return;e.preventDefault();let dist=Math.hypot(e.clientX-drag.x,e.clientY-drag.y);if(dist>4)drag.moved=true;if(!drag.moved)return;let rect=svg.getBoundingClientRect(),dx=(e.clientX-drag.x)/rect.width*drag.v[2],dy=(e.clientY-drag.y)/rect.height*drag.v[3];view=[drag.v[0]-dx,drag.v[1]-dy,drag.v[2],drag.v[3]];applyView()};svg.onpointerup=e=>{if(!drag)return;let d=drag;drag=null;if(!d.moved){let el=d.target;if(el?.dataset?.poiIndex!==undefined){showPoiDetail(POIS[+el.dataset.poiIndex])}else if(el?.dataset?.sectorId){selectSector(el.dataset.sectorId)}}};svg.onpointercancel=()=>drag=null;svg.onwheel=e=>{e.preventDefault();zoom(e.deltaY>0?1.15:.87);renderMap()};
 svg.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;e.preventDefault();let t=e.touches[0];drag={x:t.clientX,y:t.clientY,v:view.slice(),target:document.elementFromPoint(t.clientX,t.clientY),moved:false}},{passive:false});svg.addEventListener('touchmove',e=>{if(!drag||e.touches.length!==1)return;e.preventDefault();let t=e.touches[0],dist=Math.hypot(t.clientX-drag.x,t.clientY-drag.y);if(dist>4)drag.moved=true;if(!drag.moved)return;let rect=svg.getBoundingClientRect(),dx=(t.clientX-drag.x)/rect.width*drag.v[2],dy=(t.clientY-drag.y)/rect.height*drag.v[3];view=[drag.v[0]-dx,drag.v[1]-dy,drag.v[2],drag.v[3]];applyView()},{passive:false});svg.addEventListener('touchend',e=>{if(!drag)return;let d=drag;drag=null;if(!d.moved){let el=d.target;if(el?.dataset?.poiIndex!==undefined)showPoiDetail(POIS[+el.dataset.poiIndex]);else if(el?.dataset?.sectorId)selectSector(el.dataset.sectorId)}},{passive:false});['poiSaude','poiEnsino','poiReligioso','poiAPS'].forEach(id=>{if($(id))$(id).onchange=renderMap});if($('poiScale')){$('poiScale').oninput=()=>{$('poiScaleOut').textContent=$('poiScale').value+'%';renderMap()}};if($('heroExplore'))$('heroExplore').onclick=()=>document.querySelector('[data-p="explorar"]').click();if($('heroAnalysis'))$('heroAnalysis').onclick=()=>document.querySelector('[data-p="analitico"]').click();document.addEventListener('pointerdown',e=>{if(!e.target.closest('.searchbox'))$('searchResults')?.classList.remove('show')});populate();renderKpis();fit();renderMap();compare();initAP();initClimate();renderStatsKpis();renderPCA();renderReg();renderHeat();renderLab();initDownloads();</script></body></html>
