@@ -49,6 +49,9 @@ dock.innerHTML=`<div class="geo-control-line">
   <div class="geo-picker-footer">A escala da informação é preservada: setores, áreas de ponderação e clima não são intercambiáveis.</div>
  </div>`;
 mapCard.insertBefore(dock,mapWrap);
+const floating=document.createElement("button");
+floating.type="button";floating.className="geo-map-selected";floating.id="geoMapSelected";floating.hidden=true;floating.setAttribute("aria-label","Abrir ficha do setor selecionado");mapWrap.appendChild(floating);
+floating.addEventListener("click",()=>detailCard.scrollIntoView({behavior:"smooth",block:"start"}));
 const insights=document.createElement("section");
 insights.className="geo-insights";
 insights.id="geoInsights";
@@ -145,10 +148,12 @@ function updateInfo(){
  $("geoHistogram").innerHTML=chart;
  $("geoHistogram").setAttribute("aria-label",n?"Histograma de "+n+" setores com dados para "+m.label:"Sem dados disponíveis");
  if(chosen){
+   floating.hidden=false;floating.innerHTML=`<span>SETOR · ${esc(chosen.bairro||"Sem bairro")}</span><strong>${format(chosenVal,m.type)}</strong><small>${esc(m.label)} · ver ficha ↗</small>`;
    const percentile=chosenVal===null?null:Math.round(vals.filter(v=>v<=chosenVal).length/n*100);
    $("geoSelected").hidden=false;
    $("geoSelected").innerHTML=`<span class="geo-selected-kicker">SETOR SELECIONADO · ${esc(chosen.bairro||"Sem bairro")}</span><strong>${format(chosenVal,m.type)}</strong><small>${esc(m.label)} · ${esc(chosen.id)}</small>${percentile!==null?`<span class="geo-percentile">Até ${percentile}% dos setores com dado têm valor igual ou menor.</span>`:"<span class='geo-percentile'>Sem medição disponível para esta variável.</span>"}`;
  }else{
+   floating.hidden=true;floating.innerHTML="";
    $("geoSelected").hidden=true;$("geoSelected").innerHTML="";
  }
  $("geoRank").innerHTML=ordered.slice(-5).reverse().map((x,i)=>`<button type="button" data-sector="${esc(x.row.id)}"><span class="geo-rank-number">${i+1}</span><span class="geo-rank-label">${esc(x.row.bairro||"Sem bairro")}<small>${esc(x.row.id)}</small></span><strong>${format(x.val,m.type)}</strong><span class="geo-rank-arrow" aria-hidden="true">↗</span></button>`).join("")||'<p class="geo-empty">Sem observações disponíveis nesta seleção.</p>';
@@ -166,6 +171,7 @@ document.querySelector('.tab[data-p="explorar"]')?.addEventListener("click",()=>
 updateInfo();
 if(mainTab){
  mainTab.click();
+ if(typeof renderMap==="function")renderMap();
  try{window.scrollTo({top:0,left:0,behavior:"instant"})}catch(_){window.scrollTo(0,0)}
 }
 })();

@@ -94,3 +94,10 @@ body.geo-ready #explorar .legend{padding:7px 9px;font-size:10px;bottom:7px;left:
 body.geo-ready #explorar .legend .grad{width:140px}
 .geo-insights-head{font-size:9px}
 }
+.geo-map-selected{position:absolute;z-index:8;top:12px;right:12px;display:flex;flex-direction:column;gap:3px;max-width:min(235px,58%);padding:12px 15px;background:#f8fcffed;border:1px solid #bfd2dc;border-left:4px solid #206c91;border-radius:13px;box-shadow:0 10px 30px #12384f40;backdrop-filter:blur(12px);text-align:left;color:#163d53;cursor:pointer}
+.geo-map-selected[hidden]{display:none!important}
+.geo-map-selected span{font-size:10px;font-weight:850;color:#50748a;line-height:1.35;letter-spacing:.25px}
+.geo-map-selected strong{font-size:clamp(18px,2.2vw,29px);line-height:1.1;color:#0a3f5e;letter-spacing:-.65px}
+.geo-map-selected small{color:#5b7b8b;font-size:10px;line-height:1.3}
+.geo-map-selected:hover{background:#fff}
+@media(max-width:620px){.geo-map-selected{top:7px;right:7px;padding:9px 10px;max-width:53%}.geo-map-selected strong{font-size:20px}.geo-map-selected span,.geo-map-selected small{font-size:9px}}
