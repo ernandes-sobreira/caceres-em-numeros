@@ -342,6 +342,53 @@ header.bar{
 .poi{filter:none!important}
 .poi-aps{filter:drop-shadow(0 1px 2px rgba(179,38,30,.24))!important}
 </style>
+<style id="final-fix-20261011-header-poi">
+/* Fecha definitivamente o espaço do cabeçalho antes da faixa territorial. */
+header.bar{
+  position:relative!important;
+  top:auto!important;
+  display:block!important;
+  height:auto!important;
+  min-height:0!important;
+  overflow:visible!important;
+  z-index:10!important;
+}
+header.bar .bar-in{
+  position:relative!important;
+  min-height:64px!important;
+  padding-bottom:12px!important;
+  overflow:visible!important;
+  grid-auto-rows:max-content!important;
+}
+header.bar .tabs{
+  position:relative!important;
+  top:auto!important;
+  margin:0!important;
+  transform:none!important;
+  align-self:center!important;
+}
+header.bar .tab{
+  position:relative!important;
+  top:auto!important;
+  bottom:auto!important;
+  margin:0!important;
+  transform:none!important;
+}
+header.bar .tab.on{box-shadow:none!important}
+.scope-strip{
+  position:relative!important;
+  top:auto!important;
+  margin-top:0!important;
+  z-index:5!important;
+  clear:both!important;
+}
+@media(max-width:1180px){
+  header.bar .bar-in{min-height:0!important;padding-bottom:14px!important}
+}
+@media(max-width:650px){
+  header.bar .bar-in{padding-bottom:11px!important}
+}
+</style>
 </head><body><header class="bar"><div class="bar-in">
 <div class="brand"><img class="brand-mark" src="app-icon.png" alt="" aria-hidden="true"><span>Cáceres em Números<small>Território • sociedade • ambiente • saúde</small></span></div>
 <nav class="tabs"><button class="tab on" data-p="publico">Público</button><button class="tab" data-p="explorar">Explorar</button><button class="tab" data-p="comparar">Comparar</button><button class="tab" data-p="economia">Economia & trabalho</button><button class="tab" data-p="clima">Clima & ambiente</button><button class="tab" data-p="analitico">Análises avançadas</button><button class="tab" data-p="pesquisador">Pesquisador</button></nav>
@@ -507,7 +554,7 @@ function poiEnabled(p){if(p.aps&&$('poiAPS')?.checked)return true;if(p.cat==='sa
 function poiColor(cat){return {saude:'#eb6834',ensino:'#eda100',religioso:'#2a78d6',agro:'#0a6b62',outros:'#7c8b9c'}[cat]||'#465a70'}
 function poiLabel(cat){return {saude:'Saúde',ensino:'Ensino',religioso:'Religioso',agro:'Agropecuário',outros:'Outra finalidade'}[cat]||cat}
 function poiInScope(p){if(currentScope==='all')return true;if(currentScope==='city')return CITY.coreIds.includes(p.setor);let s=D.sectors.find(x=>x.id===p.setor);return currentScope==='urban'?s?.situacao==='Urbana':s?.situacao==='Rural'}
-function renderPois(svg){let px=Math.max(280,svg.clientWidth||600),wu=view[2]/px,scale=Math.max(.2,Math.min(1,Number($('poiScale')?.value||80)/100)),rr=wu*(3.8+scale*5.6),showAPS=$('poiAPS')?.checked;POIS.forEach((p,i)=>{if(!poiEnabled(p)||!poiInScope(p))return;let isAPS=p.aps&&showAPS,c=document.createElementNS('http://www.w3.org/2000/svg','circle'),rad=isAPS?rr*1.42:(p.cat==='saude'?rr*1.18:rr),opacity=isAPS?(.68+scale*.18):(p.cat==='saude'?(.30+scale*.38):(.18+scale*.34)),fill=isAPS?'#b3261e':poiColor(p.cat);c.setAttribute('cx',p.x);c.setAttribute('cy',p.y);c.setAttribute('r',rad);c.setAttribute('fill',fill);c.setAttribute('fill-opacity',opacity.toFixed(2));c.setAttribute('stroke',isAPS?'#fff':fill);c.setAttribute('stroke-opacity',isAPS?'1':'.88');c.setAttribute('stroke-width',isAPS?'1.35':'.85');c.setAttribute('vector-effect','non-scaling-stroke');c.setAttribute('class','poi'+(isAPS?' poi-aps':''));c.dataset.poiIndex=i;c.onpointermove=e=>{if(!drag||!drag.moved)showPoiTip(e,p)};c.onpointerleave=()=>{$('tip').style.display='none'};svg.appendChild(c)})}
+function renderPois(svg){let px=Math.max(280,svg.clientWidth||600),wu=view[2]/px,scale=Math.max(.2,Math.min(1,Number($('poiScale')?.value||80)/100)),rr=wu*(6.5+scale*8.5),showAPS=$('poiAPS')?.checked;POIS.forEach((p,i)=>{if(!poiEnabled(p)||!poiInScope(p))return;let isAPS=p.aps&&showAPS,c=document.createElementNS('http://www.w3.org/2000/svg','circle'),rad=isAPS?rr*1.52:(p.cat==='saude'?rr*1.24:rr),opacity=isAPS?(.82+scale*.12):(p.cat==='saude'?(.46+scale*.28):(.34+scale*.27)),fill=isAPS?'#b3261e':poiColor(p.cat);c.setAttribute('cx',p.x);c.setAttribute('cy',p.y);c.setAttribute('r',rad);c.setAttribute('fill',fill);c.setAttribute('fill-opacity',opacity.toFixed(2));c.setAttribute('stroke',isAPS?'#fff':fill);c.setAttribute('stroke-opacity',isAPS?'1':'.92');c.setAttribute('stroke-width',isAPS?'1.6':'1.0');c.setAttribute('vector-effect','non-scaling-stroke');c.setAttribute('class','poi'+(isAPS?' poi-aps':''));c.dataset.poiIndex=i;c.onpointermove=e=>{if(!drag||!drag.moved)showPoiTip(e,p)};c.onpointerleave=()=>{$('tip').style.display='none'};svg.appendChild(c)})}
 function showPoiTip(e,p){let b=$('map').parentElement.getBoundingClientRect(),t=$('tip');t.style.display='block';t.style.left=Math.min(b.width-300,Math.max(5,e.clientX-b.left+12))+'px';t.style.top=Math.max(5,e.clientY-b.top+12)+'px';t.innerHTML=`<b>${p.name}</b><br>${poiLabel(p.cat)}${p.aps?' • UBS/APS':''}<br>${p.address||''}${p.localidade?'<br>'+p.localidade:''}<br>Setor ${p.setor}`}
 function showPoiDetail(p){selected=null;searchFocus={type:'poi',poi:p};renderMap();let s=D.sectors.find(x=>x.id===p.setor),bairro=s?.bairro||p.localidade||'não informado',ap=s?.apond?('Área de Ponderação '+s.apond.slice(-3)):'não informada';$('sectorDetail').innerHTML=`<div class="pill" style="margin-bottom:8px">Ponto encontrado</div><h3>${p.name}</h3><p class="muted">${poiLabel(p.cat)}${p.aps?' • UBS/APS':''}</p><div class="detailgrid">${detailItem('Bairro',bairro)}${detailItem('Setor',p.setor||'não informado')}${detailItem('Área de Ponderação',ap)}${detailItem('Endereço',p.address||'não informado')}${detailItem('Localidade CNEFE',p.localidade||'não informada')}${detailItem('Latitude',p.lat.toFixed(6))}${detailItem('Longitude',p.lon.toFixed(6))}${detailItem('Fonte','CNEFE 2022 — IBGE')}</div><p class="source">A base atual ainda não contém a divisão oficial de zonas sanitárias; por isso ela não é inferida nem substituída por outra unidade territorial.</p>`}
 
