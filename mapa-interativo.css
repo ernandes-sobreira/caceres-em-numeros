@@ -120,3 +120,19 @@ main,.page,.card,.grid,.chartbox{min-width:0}
 .mobile-poi[open]>summary:after{content:" −"}
 .mobile-poi>#poiControls{padding:10px}
 @media(max-width:620px){header.bar .brand span{font-size:17px!important}.source-table-scroll{width:100%}#explorar>.notice{font-size:0!important;line-height:0!important;padding:8px 10px!important}#explorar>.notice:before{content:"Mapa por setor: toque em um polígono para ver a ficha. Escala inicial: 148 setores da sede urbana.";display:block;font-size:11px;line-height:1.4;color:var(--ink)}.mobile-poi>.poi-controls{margin:0!important}.mobile-poi .poi-chips{display:flex;flex-wrap:wrap;gap:5px}}
+
+.geo-poi-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:10px 0 11px}
+.geo-quick-layer{appearance:none;display:flex;align-items:center;gap:7px;min-width:0;padding:9px 10px;cursor:pointer;background:#fff;border:1px solid #d9e2e9;border-radius:11px;font:750 12px/1.2 Arial,sans-serif;color:#97a2a8}
+.geo-quick-layer.on{background:#f0f7fa;border-color:#a7c7d7;color:#21485e}
+.geo-layer-dot{width:23px;height:23px;border-radius:50%;color:white;display:grid;place-items:center;font:800 13px Arial,sans-serif;opacity:.48;flex:none}
+.geo-quick-layer.on .geo-layer-dot{opacity:1}
+.geo-dot-ensino{background:#146da5}.geo-dot-religioso{background:#74539b}.geo-dot-ubs{background:#c73e4b}.geo-dot-upa{background:#94294d}
+.geo-layer-name{flex:1;text-align:left;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.geo-quick-layer strong{font-size:11px;color:#7895a4}.geo-quick-layer.on strong{color:#226483}
+.poi-point circle,.poi-point text{pointer-events:none}.poi-point .poi-hit{pointer-events:all;cursor:pointer}
+.geo-poi-popup{position:absolute;z-index:11;top:9px;left:9px;max-width:calc(100% - 18px);width:min(285px,100%);padding:12px 13px;background:#fffffff2;border:1px solid #c3d9e4;border-left:4px solid #247ba0;border-radius:13px;box-shadow:0 13px 33px #102b4840;backdrop-filter:blur(9px);color:#15374f;display:flex;flex-direction:column;gap:5px}
+.geo-poi-popup[hidden]{display:none!important}.geo-poi-source{letter-spacing:.8px;font-weight:850;font-size:9px!important;color:#51768a!important}
+.geo-poi-popup>b{font-size:14px;line-height:1.28;padding-right:28px}.geo-poi-popup>span{font-size:11px;color:#47677b}.geo-poi-popup>small:not(.geo-poi-source){font-size:11px;line-height:1.4;color:#607d8b}
+.geo-poi-close{position:absolute;top:5px;right:6px;border:0;border-radius:8px;background:#ecf4f7;color:#214f68;width:28px;height:28px;cursor:pointer;font-size:21px}
+.geo-poi-open{color:#145f80;background:transparent;border:0;font-size:11px;font-weight:800;padding:3px 0 0;text-align:left;cursor:pointer}
+@media(max-width:620px){.geo-poi-quick{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.geo-quick-layer{font-size:11px;padding:8px}.geo-layer-dot{height:22px;width:22px;font-size:12px}.geo-poi-popup{top:7px;left:7px;padding:11px;width:min(255px,calc(100% - 14px))}}

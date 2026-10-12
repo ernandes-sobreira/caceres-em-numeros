@@ -38,7 +38,7 @@ if(window.matchMedia("(max-width:620px)").matches){
  const controls=document.getElementById("poiControls");
  if(controls){
    const fold=document.createElement("details");fold.className="mobile-poi";
-   const summary=document.createElement("summary");summary.textContent="Pontos do CNEFE · mostrar filtros";
+   const summary=document.createElement("summary");summary.textContent="Outros locais e opções do CNEFE";
    controls.parentNode.insertBefore(fold,controls);fold.appendChild(summary);fold.appendChild(controls);
  }
 }
@@ -57,6 +57,43 @@ dock.innerHTML=`<div class="geo-control-line">
   <div class="geo-picker-footer">A escala da informação é preservada: setores, áreas de ponderação e clima não são intercambiáveis.</div>
  </div>`;
 mapCard.insertBefore(dock,mapWrap);
+
+const poiQuick=document.createElement("div");
+poiQuick.id="geoPoiQuick";poiQuick.className="geo-poi-quick";poiQuick.setAttribute("role","group");poiQuick.setAttribute("aria-label","Exibir escolas, templos, UBS e UPA no mapa");
+const poiLayers=[
+ {id:"poiEnsino",title:"Escolas",symbol:"E",kind:"ensino",match:p=>p.cat==="ensino"},
+ {id:"poiReligioso",title:"Templos",symbol:"T",kind:"religioso",match:p=>p.cat==="religioso"},
+ {id:"poiAPS",title:"UBS/APS",symbol:"+",kind:"ubs",match:p=>isUbsPoint(p)},
+ {id:"poiUPA",title:"UPA",symbol:"U",kind:"upa",match:p=>isUpaPoint(p)}
+];
+function updatePoiQuick(){
+ poiQuick.innerHTML=poiLayers.map(l=>{
+  const count=POIS.filter(p=>l.match(p)&&poiInScope(p)).length;
+  const active=!!$(l.id)?.checked;
+  return '<button type="button" class="geo-quick-layer '+(active?'on':'')+'" data-poi-toggle="'+l.id+'" aria-pressed="'+active+'"><span class="geo-layer-dot geo-dot-'+l.kind+'" aria-hidden="true">'+l.symbol+'</span><span class="geo-layer-name">'+l.title+'</span><strong>'+count+'</strong></button>';
+ }).join("");
+}
+poiQuick.addEventListener("click",e=>{const b=e.target.closest("[data-poi-toggle]");if(b)$(b.dataset.poiToggle)?.click();});
+["poiEnsino","poiReligioso","poiAPS","poiUPA","poiSaude"].forEach(id=>$(id)?.addEventListener("change",updatePoiQuick));
+$("scope")?.addEventListener("change",()=>requestAnimationFrame(updatePoiQuick));
+mapCard.insertBefore(poiQuick,mapWrap);
+updatePoiQuick();
+const poiPopup=document.createElement("section");poiPopup.className="geo-poi-popup";poiPopup.id="geoPoiPopup";poiPopup.hidden=true;poiPopup.setAttribute("aria-live","polite");mapWrap.appendChild(poiPopup);
+window.geoHidePoi=()=>{poiPopup.hidden=true;};
+window.geoShowPoi=p=>{
+ const kind=isUpaPoint(p)?"UPA · nome no CNEFE":isUbsPoint(p)?"UBS/APS · nome no CNEFE":p.cat==="ensino"?"Ensino · CNEFE":p.cat==="religioso"?"Religioso · CNEFE":"Saúde · CNEFE sem curadoria";
+ poiPopup.hidden=false;
+ poiPopup.innerHTML='<button type="button" class="geo-poi-close" aria-label="Fechar detalhe">×</button><small class="geo-poi-source">LOCAL NO CNEFE 2022</small><b>'+esc(p.name)+'</b><span>'+esc(kind)+'</span><small>'+esc(p.address||"Endereço não informado")+'</small><button type="button" class="geo-poi-open">Ver ficha completa ↗</button>';
+ poiPopup.querySelector(".geo-poi-close").addEventListener("click",()=>window.geoHidePoi());
+ poiPopup.querySelector(".geo-poi-open").addEventListener("click",()=>detailCard.scrollIntoView({behavior:"smooth",block:"start"}));
+};
+const originalPoiDetail=showPoiDetail;
+showPoiDetail=function(p){originalPoiDetail(p);window.geoShowPoi(p);};
+const originalSelectSector=selectSector;
+selectSector=function(id){window.geoHidePoi();originalSelectSector(id);};
+mainTab?.addEventListener("click",()=>requestAnimationFrame(()=>{renderMap();updatePoiQuick()}));
+window.addEventListener("resize",()=>{if(page.classList.contains("on"))requestAnimationFrame(()=>{renderMap();updatePoiQuick()})});
+
 const floating=document.createElement("button");
 floating.type="button";floating.className="geo-map-selected";floating.id="geoMapSelected";floating.hidden=true;floating.setAttribute("aria-label","Abrir ficha do setor selecionado");mapWrap.appendChild(floating);
 floating.addEventListener("click",()=>detailCard.scrollIntoView({behavior:"smooth",block:"start"}));
