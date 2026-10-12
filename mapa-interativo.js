@@ -34,6 +34,14 @@ const labelSource={setor:"Setores censitários",area:"Áreas de ponderação",cl
 let activeSource="setor",searchText="",opened=false;
 const mapCard=map.closest(".card"),mapWrap=map.closest(".mapwrap"),detailCard=sectorDetail.closest(".card");
 if(!mapCard||!mapWrap||!detailCard)return;
+if(window.matchMedia("(max-width:620px)").matches){
+ const controls=document.getElementById("poiControls");
+ if(controls){
+   const fold=document.createElement("details");fold.className="mobile-poi";
+   const summary=document.createElement("summary");summary.textContent="Pontos do CNEFE · mostrar filtros";
+   controls.parentNode.insertBefore(fold,controls);fold.appendChild(summary);fold.appendChild(controls);
+ }
+}
 const dock=document.createElement("div");
 dock.className="geo-dock";
 dock.innerHTML=`<div class="geo-control-line">
@@ -169,9 +177,5 @@ map.addEventListener("pointerup",()=>setTimeout(updateInfo,0));
 map.addEventListener("touchend",()=>setTimeout(updateInfo,0),{passive:true});
 document.querySelector('.tab[data-p="explorar"]')?.addEventListener("click",()=>setTimeout(updateInfo,0));
 updateInfo();
-if(mainTab){
- mainTab.click();
- if(typeof renderMap==="function")renderMap();
- try{window.scrollTo({top:0,left:0,behavior:"instant"})}catch(_){window.scrollTo(0,0)}
-}
+
 })();
