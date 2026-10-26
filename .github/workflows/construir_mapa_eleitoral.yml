@@ -1,0 +1,113 @@
+name: Construir mapa oficial do voto em Caceres
+on:
+  push:
+    branches: [analise-votacao-caceres-2turno-2026]
+    paths: ['.github/workflows/construir_mapa_eleitoral.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  mapa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recuperar compilacao oficial por local
+        uses: actions/download-artifact@v4
+        with:
+          name: caceres-2turno-bairros
+          run-id: 40371519119
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: resultado_prev
+      - name: Preparar geometria
+        run: pip install --disable-pip-version-check shapely
+      - name: Cruzar coordenadas TSE, limites IBGE e votos por local
+        shell: bash
+        run: |
+          cat > montar.py <<'PYWORK'
+          from pathlib import Path
+          import csv,json,unicodedata,collections
+          from shapely.geometry import Point,shape
+          def fix(v):
+           if isinstance(v,str) and ('Ã' in v or 'Â' in v):
+            try:return v.encode('latin-1').decode('utf-8')
+            except UnicodeError:return v
+           return v
+          def norm(s):
+           return ''.join(c for c in unicodedata.normalize('NFKD',str(s).casefold()) if not unicodedata.combining(c)).strip()
+          root=Path('analises/eleicoes2026')
+          geo=json.loads((root/'caceres_bairros_ibge_2022.geojson').read_text(encoding='utf-8'))
+          coords=json.loads((root/'caceres_locais_tse_2turno.json').read_text(encoding='utf-8'))
+          vote_path=Path('resultado_prev/caceres_2turno_locais.csv')
+          assert vote_path.exists(),vote_path
+          with vote_path.open(encoding='utf-8-sig',newline='') as f:votes=list(csv.DictReader(f,delimiter=';'))
+          for f in geo['features']:
+           f['properties']['bairro']=fix(f['properties']['bairro'])
+           f['properties'].update(v13=0,v22=0,locais=0,nomesLocais=[])
+          by_key={(norm(c['bairro']),norm(c['local']),norm(c['endereco'])):c for c in coords}
+          by_name={(norm(c['bairro']),norm(c['local'])):c for c in coords}
+          points=[];missing=[]
+          for v in votes:
+           key=(norm(v['Bairro do local']),norm(v['Local de votação']),norm(v['Endereço']))
+           c=by_key.get(key) or by_name.get(key[:2])
+           if not c:
+            missing.append(key);continue
+           p={'bairro_tse':v['Bairro do local'],'local':v['Local de votação'],'endereco':v['Endereço'],
+              'lat':c['lat'],'lon':c['lon'],'nr_local_votacao':c['nr_local_votacao'],
+              'secoes':int(v['Seções']),'v13':int(v['Lula']),'v22':int(v['Flávio Bolsonaro']),
+              'bairro_ibge':None,'locais':1}
+           points.append(p)
+          print('LOCALS',len(points),'MISSING_MATCH',missing,flush=True)
+          assert len(points)==38 and not missing
+          assert all(p['lat'] is not None and p['lon'] is not None for p in points)
+          assert sum(p['v13'] for p in points)==22220
+          assert sum(p['v22'] for p in points)==24663
+          spatial=[]
+          for idx,f in enumerate(geo['features']):
+           try:spatial.append((idx,shape(f['geometry'])))
+           except Exception as e:print('geom issue',idx,e,flush=True)
+          unmatched=[];multiple=[]
+          for p in points:
+           pos=Point(p['lon'],p['lat'])
+           hits=[(idx,g) for idx,g in spatial if g.covers(pos)]
+           if len(hits)>1:multiple.append((p['local'],[(geo['features'][i]['properties']['bairro'],g.area) for i,g in hits]))
+           if not hits:
+            unmatched.append(p['local']);continue
+           i,_=min(hits,key=lambda pair:pair[1].area)
+           feat=geo['features'][i]['properties']
+           p['bairro_ibge']=feat['bairro']
+           feat['v13']+=p['v13'];feat['v22']+=p['v22'];feat['locais']+=1
+           feat['nomesLocais'].append(p['local'])
+          print('BAIRROS_IBGE',len(geo['features']), 'POVOADOS',sum(f['properties']['locais']>0 for f in geo['features']))
+          print('LOCAIS_ASSOCIADOS',len(points)-len(unmatched),'NAO_ASSOCIADOS',unmatched)
+          print('MULTIPLOS',multiple)
+          for p in points:
+           if norm(p['bairro_tse'])!=norm(p['bairro_ibge']) and p['bairro_ibge']:
+            print('NOME DIFERENTE',p['bairro_tse'],'->',p['bairro_ibge'],'|',p['local'])
+          template=(root/'mapa_votacao_template.html').read_text(encoding='utf-8')
+          assert template.count('__POINTS__')==1 and template.count('__BAIRROS__')==1
+          file=template.replace('__POINTS__',json.dumps(points,ensure_ascii=False,separators=(',',':'))).replace('__BAIRROS__',json.dumps(geo,ensure_ascii=False,separators=(',',':')))
+          out=Path('eleicoes-2026/index.html')
+          out.parent.mkdir(parents=True,exist_ok=True)
+          out.write_text(file,encoding='utf-8')
+          Path('mapa_caceres_votacao_2turno_2026.html').write_text(file,encoding='utf-8')
+          root.joinpath('validacao_mapa_2026.json').write_text(json.dumps({'localidades':len(points),'bairros_ibge':len(geo['features']),'votos_lula':sum(p['v13'] for p in points),'votos_flavio':sum(p['v22'] for p in points),'locais_dentro_dos_bairros':len(points)-len(unmatched),'locais_fora_dos_bairros':unmatched,'sobreposicoes':multiple},ensure_ascii=False,indent=2),encoding='utf-8')
+          print('HTML_OK tamanho',len(file),'LOCALIDADES',len(points),'TOTAL',sum(p['v13']+p['v22'] for p in points),flush=True)
+          
+          PYWORK
+          python montar.py
+      - name: Criar HTML unico pronto
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapa-html-caceres-2turno-2026
+          path: |
+            mapa_caceres_votacao_2turno_2026.html
+            analises/eleicoes2026/validacao_mapa_2026.json
+      - name: Registrar mapa na ramificacao
+        shell: bash
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add eleicoes-2026/index.html analises/eleicoes2026/validacao_mapa_2026.json
+          git commit -m "Publicacao candidata: mapa de votacao 2T Caceres TSE + bairros IBGE" || true
+          git push
