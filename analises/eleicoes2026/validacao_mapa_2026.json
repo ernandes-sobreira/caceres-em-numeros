@@ -1,0 +1,20 @@
+{
+  "localidades": 38,
+  "bairros_ibge": 47,
+  "votos_lula": 22220,
+  "votos_flavio": 24663,
+  "locais_dentro_dos_bairros": 28,
+  "locais_fora_dos_bairros": [
+    "ESCOLA ESTADUAL DOZE DE OUTUBRO",
+    "ESCOLA MUNICIPAL LIMOEIRO (PAULO FREIRE EXTENSÃO II)",
+    "ESCOLA MUNICIPAL PAULO FREIRE",
+    "ESCOLA MUNICIPAL CLARINÓPOLIS",
+    "ESCOLA MUNICIPAL UNIÃO",
+    "ESCOLA MUNICIPAL SANTO ANTÔNIO DO CARAMUJO (ZONA RURAL)",
+    "ESCOLA MUNICIPAL BURITI",
+    "ESCOLA MUNICIPAL DEZESSEIS DE MARÇO",
+    "ESCOLA MUNICIPAL LARANJEIRA",
+    "ESCOLA MUNICIPAL SANTA CATARINA"
+  ],
+  "sobreposicoes": []
+}
