@@ -5,67 +5,88 @@ on:
 jobs:
   compilar:
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
-      - name: Baixar e agrupar dados do TSE
+      - name: Extrair BUs do segundo turno e agrupar por bairro
         shell: bash
         run: |
           cat > worker.py <<'PYWORK'
-          import urllib.request, zipfile,io,csv,unicodedata,collections,json,time
+          import urllib.request,zipfile,io,csv,unicodedata,collections,json,sys,concurrent.futures
+          from pathlib import Path
           def norm(s):
            return ''.join(x for x in unicodedata.normalize('NFKD',str(s)) if not unicodedata.combining(x)).upper()
-          def get(u):
+          def get_zip(u):
            print('Baixando',u,flush=True)
-           for n in range(3):
-            try:
-             req=urllib.request.Request(u+'?cache=20261026v3',headers={'User-Agent':'Mozilla/5.0'})
-             with urllib.request.urlopen(req,timeout=180) as r: data=r.read()
-             print('Bytes:',len(data),flush=True);return zipfile.ZipFile(io.BytesIO(data))
-            except Exception as e:
-             print('erro download',str(e),flush=True);time.sleep(3)
-           raise RuntimeError('Falha download')
+           req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+           with urllib.request.urlopen(req,timeout=180) as rsp:data=rsp.read()
+           z=zipfile.ZipFile(io.BytesIO(data))
+           print('ZIP pronto:',len(data),z.namelist()[:3],flush=True)
+           return z
           def records(z):
-           for file in z.namelist():
-            if not file.endswith('.csv'):continue
-            with z.open(file) as f:
+           for name in z.namelist():
+            if not name.lower().endswith('.csv'):continue
+            with z.open(name) as f:
              yield from csv.DictReader(io.TextIOWrapper(f,encoding='latin-1',newline=''),delimiter=';')
-          src=get('https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_2026_MT.zip')
-          votes=collections.defaultdict(lambda:collections.Counter()); codes=set();total=collections.Counter()
-          for r in records(src):
-           if r.get('NR_TURNO')!='2' or r.get('CD_CARGO')!='1' or norm(r.get('NM_MUNICIPIO',''))!='CACERES':continue
-           if r.get('NR_VOTAVEL') not in ('13','22'):continue
-           k=(r['CD_MUNICIPIO'],int(r['NR_ZONA']),int(r['NR_SECAO']))
-           v=int(r['QT_VOTOS']);votes[k][r['NR_VOTAVEL']]+=v;total[r['NR_VOTAVEL']]+=v;codes.add(r['CD_MUNICIPIO'])
-          print('TOTAL_2T',dict(total),'SECOES',len(votes),flush=True)
-          if not votes:raise RuntimeError('Arquivo do TSE ainda não inclui segundo turno')
-          src=get('https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/eleitorado_local_votacao_2026.zip')
+          z=get_zip('https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/eleitorado_local_votacao_2026.zip')
           loc={}
-          for r in records(src):
-           if r.get('NR_TURNO')!='2' or r.get('CD_MUNICIPIO') not in codes:continue
-           k=(r['CD_MUNICIPIO'],int(r['NR_ZONA']),int(r['NR_SECAO']))
-           if k not in votes:continue
-           loc[k]=(r.get('NM_BAIRRO') or 'Bairro não cadastrado',r.get('NM_LOCAL_VOTACAO') or 'Local não cadastrado',r.get('DS_ENDERECO') or '')
-          hood=collections.defaultdict(lambda:[0,0,0,set()]);places=collections.defaultdict(lambda:[0,0,0])
-          for k,v in votes.items():
-           if k not in loc:continue
-           b,p,end=loc[k];h=hood[b];h[0]+=v['13'];h[1]+=v['22'];h[2]+=1;h[3].add(p)
-           q=places[(b,p,end)];q[0]+=v['13'];q[1]+=v['22'];q[2]+=1
-          print('COBERTURA',len(loc),'de',len(votes),'SECOES',flush=True)
-          def percent(a,b):return round(100*a/(a+b),2) if a+b else ''
+          cnt=collections.Counter()
+          for r in records(z):
+           if norm(r.get('NM_MUNICIPIO','')) != 'CACERES':continue
+           cnt[r.get('NR_TURNO','?')]+=1
+           if r.get('NR_TURNO')!='2':continue
+           try:k=(r['CD_MUNICIPIO'].zfill(5),r['NR_ZONA'].zfill(4),r['NR_SECAO'].zfill(4))
+           except KeyError as e:raise RuntimeError('colunas:'+str(list(r))) from e
+           loc[k]=dict(bairro=r.get('NM_BAIRRO') or 'Bairro não cadastrado',local=r.get('NM_LOCAL_VOTACAO') or 'Local não cadastrado',endereco=r.get('DS_ENDERECO') or '')
+          print('CADASTRO',dict(cnt),'secoes_2t',len(loc),'codigos',set(k[0] for k in loc),flush=True)
+          if not loc:raise RuntimeError('Cadastro local de 2o turno não encontrado')
+          # Código adaptado do extrator de boletins públicos do TSE de cicerohellmann/eleicao-2026
+          # Fonte https://github.com/cicerohellmann/eleicao-2026/blob/main/tools/scrape_bu.py
+          sys.argv=['scrape_bu.py','/tmp',18,'20','mt']
+          src=urllib.request.urlopen('https://raw.githubusercontent.com/cicerohellmann/eleicao-2026/main/tools/scrape_bu.py',timeout=35).read().decode()
+          exec(src[:src.index('os.makedirs(f"{SP}/bu"')],globals())
+          def one_key(k):
+           try:return k,one('mt',*k)
+           except Exception as e:return k,{'k':'-'.join(k),'miss':'err','e':repr(e)[:150]}
+          results={}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=18) as pool:
+           for k,r in pool.map(one_key,loc):
+            results[k]=r
+            if len(results)%30==0:print('processadas',len(results),len(loc),flush=True)
+          total=collections.Counter()
+          bairro=collections.defaultdict(lambda:collections.Counter())
+          local=collections.defaultdict(lambda:collections.Counter())
+          missing=[]
+          for k,r in results.items():
+           if '13' not in r or '22' not in r:
+            missing.append([list(k),r]);continue
+           v13=int(r['13']);v22=int(r['22'])
+           total.update({'13':v13,'22':v22})
+           b,p,e=loc[k]['bairro'],loc[k]['local'],loc[k]['endereco']
+           bairro[b].update({'13':v13,'22':v22,'secoes':1})
+           local[(b,p,e)].update({'13':v13,'22':v22,'secoes':1})
+          print('TOTAIS',dict(total),'COMPLETAS',len(loc)-len(missing),'FALTANTES',len(missing),flush=True)
+          if missing:print('FALHAS',json.dumps(missing[:50],ensure_ascii=False),flush=True)
+          def p(a,b):return round(a*100/(a+b),2) if a+b else ''
           with open('caceres_2turno_bairros.csv','w',encoding='utf-8-sig',newline='') as f:
-           w=csv.writer(f,delimiter=';');w.writerow(['Bairro do local','Votos Lula','Votos Flávio','Lula (%)','Flávio (%)','Seções','Locais'])
-           for b,v in sorted(hood.items()):
-            w.writerow([b,v[0],v[1],percent(v[0],v[1]),percent(v[1],v[0]),v[2],len(v[3])])
+           w=csv.writer(f,delimiter=';');w.writerow(['Bairro do local','Lula','Flávio Bolsonaro','Lula (%)','Flávio (%)','Seções'])
+           for b,d in sorted(bairro.items()):
+            w.writerow([b,d['13'],d['22'],p(d['13'],d['22']),p(d['22'],d['13']),d['secoes']])
           with open('caceres_2turno_locais.csv','w',encoding='utf-8-sig',newline='') as f:
-           w=csv.writer(f,delimiter=';');w.writerow(['Bairro','Local de votação','Endereço','Votos Lula','Votos Flávio','Lula (%)','Flávio (%)','Seções'])
-           for (b,p,end),v in sorted(places.items()):
-            w.writerow([b,p,end,v[0],v[1],percent(v[0],v[1]),percent(v[1],v[0]),v[2]])
-          print('RESULTADOS_JSON',json.dumps({'total':dict(total),'secoes':len(votes),'associadas':len(loc),'bairros':{b:[v[0],v[1],v[2],len(v[3])] for b,v in hood.items()},'locais':{b+' | '+p:[v[0],v[1],v[2]] for (b,p,e),v in places.items()}},ensure_ascii=False),flush=True)
+           w=csv.writer(f,delimiter=';');w.writerow(['Bairro do local','Local de votação','Endereço','Lula','Flávio Bolsonaro','Lula (%)','Flávio (%)','Seções'])
+           for (b,l,e),d in sorted(local.items()):
+            w.writerow([b,l,e,d['13'],d['22'],p(d['13'],d['22']),p(d['22'],d['13']),d['secoes']])
+          out={'total':dict(total),'cobertura':[len(loc)-len(missing),len(loc)],'bairros':{b:dict(v) for b,v in bairro.items()},'falhas':missing}
+          Path('caceres_2turno_resultados.json').write_text(json.dumps(out,ensure_ascii=False,indent=2))
+          print('RESULTADOS_JSON',json.dumps(out,ensure_ascii=False),flush=True)
+          
           PYWORK
           python worker.py
-      - name: Exportar tabela CSV
+      - name: Exportar resultados e cobertura
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: caceres-2turno-bairros
-          path: caceres_2turno_*.csv
+          path: |
+            caceres_2turno_*.csv
+            caceres_2turno_*.json
           if-no-files-found: ignore
