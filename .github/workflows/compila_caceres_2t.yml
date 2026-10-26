@@ -1,0 +1,71 @@
+name: Compilar votos 2T por bairro de Caceres
+on:
+  push:
+    branches: [analise-votacao-caceres-2turno-2026]
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar e agrupar dados do TSE
+        shell: bash
+        run: |
+          cat > worker.py <<'PYWORK'
+          import urllib.request, zipfile,io,csv,unicodedata,collections,json,time
+          def norm(s):
+           return ''.join(x for x in unicodedata.normalize('NFKD',str(s)) if not unicodedata.combining(x)).upper()
+          def get(u):
+           print('Baixando',u,flush=True)
+           for n in range(3):
+            try:
+             req=urllib.request.Request(u+'?cache=20261026v3',headers={'User-Agent':'Mozilla/5.0'})
+             with urllib.request.urlopen(req,timeout=180) as r: data=r.read()
+             print('Bytes:',len(data),flush=True);return zipfile.ZipFile(io.BytesIO(data))
+            except Exception as e:
+             print('erro download',str(e),flush=True);time.sleep(3)
+           raise RuntimeError('Falha download')
+          def records(z):
+           for file in z.namelist():
+            if not file.endswith('.csv'):continue
+            with z.open(file) as f:
+             yield from csv.DictReader(io.TextIOWrapper(f,encoding='latin-1',newline=''),delimiter=';')
+          src=get('https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_2026_MT.zip')
+          votes=collections.defaultdict(lambda:collections.Counter()); codes=set();total=collections.Counter()
+          for r in records(src):
+           if r.get('NR_TURNO')!='2' or r.get('CD_CARGO')!='1' or norm(r.get('NM_MUNICIPIO',''))!='CACERES':continue
+           if r.get('NR_VOTAVEL') not in ('13','22'):continue
+           k=(r['CD_MUNICIPIO'],int(r['NR_ZONA']),int(r['NR_SECAO']))
+           v=int(r['QT_VOTOS']);votes[k][r['NR_VOTAVEL']]+=v;total[r['NR_VOTAVEL']]+=v;codes.add(r['CD_MUNICIPIO'])
+          print('TOTAL_2T',dict(total),'SECOES',len(votes),flush=True)
+          if not votes:raise RuntimeError('Arquivo do TSE ainda não inclui segundo turno')
+          src=get('https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/eleitorado_local_votacao_2026.zip')
+          loc={}
+          for r in records(src):
+           if r.get('NR_TURNO')!='2' or r.get('CD_MUNICIPIO') not in codes:continue
+           k=(r['CD_MUNICIPIO'],int(r['NR_ZONA']),int(r['NR_SECAO']))
+           if k not in votes:continue
+           loc[k]=(r.get('NM_BAIRRO') or 'Bairro não cadastrado',r.get('NM_LOCAL_VOTACAO') or 'Local não cadastrado',r.get('DS_ENDERECO') or '')
+          hood=collections.defaultdict(lambda:[0,0,0,set()]);places=collections.defaultdict(lambda:[0,0,0])
+          for k,v in votes.items():
+           if k not in loc:continue
+           b,p,end=loc[k];h=hood[b];h[0]+=v['13'];h[1]+=v['22'];h[2]+=1;h[3].add(p)
+           q=places[(b,p,end)];q[0]+=v['13'];q[1]+=v['22'];q[2]+=1
+          print('COBERTURA',len(loc),'de',len(votes),'SECOES',flush=True)
+          def percent(a,b):return round(100*a/(a+b),2) if a+b else ''
+          with open('caceres_2turno_bairros.csv','w',encoding='utf-8-sig',newline='') as f:
+           w=csv.writer(f,delimiter=';');w.writerow(['Bairro do local','Votos Lula','Votos Flávio','Lula (%)','Flávio (%)','Seções','Locais'])
+           for b,v in sorted(hood.items()):
+            w.writerow([b,v[0],v[1],percent(v[0],v[1]),percent(v[1],v[0]),v[2],len(v[3])])
+          with open('caceres_2turno_locais.csv','w',encoding='utf-8-sig',newline='') as f:
+           w=csv.writer(f,delimiter=';');w.writerow(['Bairro','Local de votação','Endereço','Votos Lula','Votos Flávio','Lula (%)','Flávio (%)','Seções'])
+           for (b,p,end),v in sorted(places.items()):
+            w.writerow([b,p,end,v[0],v[1],percent(v[0],v[1]),percent(v[1],v[0]),v[2]])
+          print('RESULTADOS_JSON',json.dumps({'total':dict(total),'secoes':len(votes),'associadas':len(loc),'bairros':{b:[v[0],v[1],v[2],len(v[3])] for b,v in hood.items()},'locais':{b+' | '+p:[v[0],v[1],v[2]] for (b,p,e),v in places.items()}},ensure_ascii=False),flush=True)
+          PYWORK
+          python worker.py
+      - name: Exportar tabela CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caceres-2turno-bairros
+          path: caceres_2turno_*.csv
+          if-no-files-found: ignore
