@@ -1,0 +1,63 @@
+name: Extrair bairros oficiais IBGE Caceres
+on:
+  push:
+    branches: [analise-votacao-caceres-2turno-2026]
+    paths: ['.github/workflows/extrair_bairros_ibge.yml']
+permissions:
+  contents: write
+jobs:
+  malha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar leitores SIG
+        run: pip install --disable-pip-version-check pyshp shapely
+      - name: Extrair bairros IBGE 2022 preservando limites reais
+        shell: bash
+        run: |
+          cat > ibge.py <<'PYWORK'
+          import urllib.request,zipfile,io,json,unicodedata
+          from pathlib import Path
+          u='https://geoftp.ibge.gov.br/organizacao_do_territorio/malhas_territoriais/malhas_de_setores_censitarios__divisoes_intramunicipais/censo_2022/bairros/shp/UF/MT_bairros_CD2022.zip'
+          print('baixando malha IBGE...',flush=True)
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+          with urllib.request.urlopen(req,timeout=160) as r:b=r.read()
+          print('zip bytes',len(b),flush=True)
+          z=zipfile.ZipFile(io.BytesIO(b))
+          names=z.namelist();print('membros',names,flush=True)
+          import shapefile
+          from shapely.geometry import shape,mapping
+          reader=shapefile.Reader(shp=io.BytesIO(z.read(next(n for n in names if n.lower().endswith('.shp')))),
+           shx=io.BytesIO(z.read(next(n for n in names if n.lower().endswith('.shx')))),
+           dbf=io.BytesIO(z.read(next(n for n in names if n.lower().endswith('.dbf')))),
+           encoding='latin-1')
+          fields=[f[0] for f in reader.fields[1:]]
+          print('FIELDS',fields,flush=True)
+          res=[]
+          for sr in reader.iterShapeRecords():
+           rec=dict(zip(fields,sr.record))
+           cd=str(rec.get('CD_MUN') or rec.get('CD_MUNICIPIO') or rec.get('CD_MUNI') or '')
+           if not cd.startswith('5102504'):continue
+           g=shape(sr.shape.__geo_interface__)
+           if not g.is_valid:g=g.buffer(0)
+           if g.is_empty:continue
+           g=g.simplify(0.000018,preserve_topology=True)
+           name=rec.get('NM_BAIRRO') or rec.get('NM_BAIR') or ''
+           res.append({'type':'Feature','properties':{'bairro':str(name).strip(),'codigo':str(rec.get('CD_BAIRRO') or '')},'geometry':mapping(g)})
+          print('CACERES BAIRROS',len(res),'NOMES',[f['properties']['bairro'] for f in res],flush=True)
+          if not res:raise RuntimeError('Nenhum bairro de Cáceres encontrado')
+          p=Path('analises/eleicoes2026/caceres_bairros_ibge_2022.geojson')
+          p.parent.mkdir(parents=True,exist_ok=True)
+          p.write_text(json.dumps({'type':'FeatureCollection','features':res},ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('SALVO',p,p.stat().st_size,'bytes',flush=True)
+          
+          PYWORK
+          python ibge.py
+      - name: Commit somente do geodado
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add analises/eleicoes2026/caceres_bairros_ibge_2022.geojson
+          git commit -m "Incluir limites de bairros do IBGE 2022 em coordenadas reais" || true
+          git push
