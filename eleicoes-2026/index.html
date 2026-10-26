@@ -254,7 +254,7 @@ document.getElementById('togglePoints').addEventListener('click',e=>{
 document.getElementById('toggleBase').addEventListener('click',e=>{
  if(raster==='streets'){map.removeLayer(streets);satellite.addTo(map);raster='satellite';e.target.textContent='Ruas'}
  else{map.removeLayer(satellite);streets.addTo(map);raster='streets';e.target.textContent='Satélite'}
- if(pointVisible)pointLayer.bringToFront();
+ if(pointVisible){map.removeLayer(pointLayer);pointLayer.addTo(map)}
 });
 document.getElementById('saveCsv').addEventListener('click',()=>{
  const h=['Bairro TSE','Local de votação','Endereço','Bairro IBGE pela coordenada','Latitude','Longitude','Lula','Flávio','Votos válidos','Lula (%)','Seções com BU'];
