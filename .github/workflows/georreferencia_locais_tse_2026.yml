@@ -1,0 +1,68 @@
+name: Georreferenciar locais TSE Caceres 2026
+on:
+  push:
+    branches: [analise-votacao-caceres-2turno-2026]
+    paths: ['.github/workflows/georreferencia_locais_tse_2026.yml']
+permissions:
+  contents: write
+jobs:
+  georreferencia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extrair latitude e longitude oficiais
+        shell: bash
+        run: |
+          cat > georef.py <<'PYWORK'
+          import urllib.request,zipfile,io,csv,unicodedata,collections,json,statistics
+          from pathlib import Path
+          def norm(x):
+           return ''.join(c for c in unicodedata.normalize('NFKD',str(x).upper()) if not unicodedata.combining(c)).strip()
+          def num(x):
+           try: return float(str(x).replace(',','.'))
+           except: return None
+          u='https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/eleitorado_local_votacao_2026.zip'
+          req=urllib.request.Request(u,headers={'User-Agent':'Mozilla/5.0'})
+          with urllib.request.urlopen(req,timeout=150) as r: content=r.read()
+          z=zipfile.ZipFile(io.BytesIO(content))
+          sites=collections.defaultdict(lambda:dict(lat=[],lon=[],secoes=set()))
+          headers=[]
+          for fname in z.namelist():
+           if not fname.lower().endswith('.csv'): continue
+           with z.open(fname) as f:
+            reader=csv.DictReader(io.TextIOWrapper(f,encoding='latin-1',newline=''),delimiter=';')
+            headers=list(reader.fieldnames or [])
+            for r in reader:
+             if r.get('NR_TURNO')!='2' or norm(r.get('NM_MUNICIPIO',''))!='CACERES': continue
+             bairro=r.get('NM_BAIRRO') or ''
+             local=r.get('NM_LOCAL_VOTACAO') or ''
+             endereco=r.get('DS_ENDERECO') or ''
+             ident=(bairro,local,endereco,r.get('NR_LOCAL_VOTACAO',''))
+             d=sites[ident]
+             d['secoes'].add(r.get('NR_SECAO',''))
+             la=num(r.get('NR_LATITUDE'));lo=num(r.get('NR_LONGITUDE'))
+             if la is not None and lo is not None and -19<la<-13 and -62<lo<-54:
+              d['lat'].append(la);d['lon'].append(lo)
+          out=[]
+          for (bairro,local,endereco,nlocal),v in sites.items():
+           out.append(dict(bairro=bairro,local=local,endereco=endereco,nr_local_votacao=nlocal,secoes=len(v['secoes']),
+           lat=statistics.median(v['lat']) if v['lat'] else None,
+           lon=statistics.median(v['lon']) if v['lon'] else None))
+          out.sort(key=lambda x:(x['bairro'],x['local']))
+          Path('analises/eleicoes2026').mkdir(parents=True,exist_ok=True)
+          Path('analises/eleicoes2026/caceres_locais_tse_2turno.json').write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('HEADERS:',headers)
+          print('TOTAL_LOCAIS',len(out),'C_COORDS',sum(x['lat'] is not None for x in out),'SECOES',sum(x['secoes'] for x in out))
+          print('COORDS_EXAMPLES',json.dumps(out[:7],ensure_ascii=False))
+          print('SEM_COORDS',json.dumps([x for x in out if x['lat'] is None],ensure_ascii=False))
+          
+          PYWORK
+          python georef.py
+      - name: Salvar arquivo de coordenadas na ramificacao
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add analises/eleicoes2026/caceres_locais_tse_2turno.json
+          git commit -m "Adicionar coordenadas oficiais dos locais de votacao de Caceres" || true
+          git push
